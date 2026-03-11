@@ -15,10 +15,9 @@ class PermissionService {
   }
 
   static Future<void> requestAudioSavePermissions() async {
-    // Saving into app-specific directories usually doesn't require runtime
-    // permissions, but on older Android versions a legacy storage permission can
-    // still be relevant.
-    await _requestLegacyStorageIfNeeded();
+    // Saving into /storage/emulated/0/EncryptAudio requires broad filesystem
+    // access on modern Android (scoped storage).
+    await _requestExternalWriteAccessIfNeeded();
   }
 
   static Future<void> _requestMediaAccess(_MediaKind kind) async {
@@ -45,7 +44,7 @@ class PermissionService {
     await Permission.storage.request();
   }
 
-  static Future<void> _requestLegacyStorageIfNeeded() async {
+  static Future<void> _requestExternalWriteAccessIfNeeded() async {
     if (!Platform.isAndroid) {
       return;
     }
@@ -56,9 +55,15 @@ class PermissionService {
       return;
     }
 
-    if (sdkInt < 33) {
-      await Permission.storage.request();
+    // Android 11+ requires MANAGE_EXTERNAL_STORAGE to write arbitrary folders
+    // under /storage/emulated/0.
+    if (sdkInt >= 30) {
+      await Permission.manageExternalStorage.request();
+      return;
     }
+
+    // Older devices can rely on legacy storage permission.
+    await Permission.storage.request();
   }
 
   static Future<int?> _androidSdkInt() async {

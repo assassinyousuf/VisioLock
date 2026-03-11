@@ -80,6 +80,22 @@ class AudioEncoder {
   }
 
   Future<Directory> _bestOutputDirectory() async {
+    if (Platform.isAndroid) {
+      final dir = Directory('/storage/emulated/0/EncryptAudio');
+      try {
+        if (!await dir.exists()) {
+          await dir.create(recursive: true);
+        }
+        return dir;
+      } on FileSystemException catch (e) {
+        throw FileSystemException(
+          'Unable to write to /storage/emulated/0/EncryptAudio. Grant "All files access" permission and try again.',
+          e.path,
+          e.osError,
+        );
+      }
+    }
+
     final external = await getExternalStorageDirectory();
     if (external != null) {
       return external;
