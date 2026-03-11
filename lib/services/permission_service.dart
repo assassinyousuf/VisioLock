@@ -20,6 +20,12 @@ class PermissionService {
     await _requestExternalWriteAccessIfNeeded();
   }
 
+  static Future<void> requestDecodedImageSavePermissions() async {
+    // Saving into /storage/emulated/0/DecodedImage requires broad filesystem
+    // access on modern Android (scoped storage).
+    await _requestExternalWriteAccessIfNeeded();
+  }
+
   static Future<void> _requestMediaAccess(_MediaKind kind) async {
     if (!Platform.isAndroid) {
       return;

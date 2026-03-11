@@ -152,7 +152,18 @@ class _ReceiverScreenState extends State<ReceiverScreen> {
 
     setState(() => _busy = true);
     try {
-      final dir = await getApplicationDocumentsDirectory();
+      await PermissionService.requestDecodedImageSavePermissions();
+
+      Directory dir;
+      if (Platform.isAndroid) {
+        dir = Directory('/storage/emulated/0/DecodedImage');
+        if (!await dir.exists()) {
+          await dir.create(recursive: true);
+        }
+      } else {
+        dir = await getApplicationDocumentsDirectory();
+      }
+
       final name = 'decoded_image_${DateTime.now().millisecondsSinceEpoch}.png';
       final file = File('${dir.path}${Platform.pathSeparator}$name');
       await file.writeAsBytes(png, flush: true);
