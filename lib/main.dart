@@ -36,7 +36,7 @@ class MyApp extends StatelessWidget {
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'DataSymphony',
+      title: 'VisioLock',
       theme: ThemeData(
         colorScheme: lightScheme,
         scaffoldBackgroundColor: AppColors.backgroundLight,

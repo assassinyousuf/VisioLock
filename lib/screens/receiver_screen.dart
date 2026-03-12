@@ -16,6 +16,7 @@ import '../services/encryption_service.dart';
 import '../services/history_service.dart';
 import '../services/image_reconstructor.dart';
 import '../services/noise_resistant_transmission_service.dart';
+import '../services/passphrase_key_service.dart';
 import '../services/permission_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/color_extensions.dart';
@@ -35,6 +36,7 @@ class _ReceiverScreenState extends State<ReceiverScreen> {
   final BiometricAuthService _biometricAuth = BiometricAuthService();
   final BiometricKeyService _biometricKeyService = BiometricKeyService();
   final CombinedKeyService _combinedKeyService = CombinedKeyService();
+  final PassphraseKeyService _passphraseKeyService = PassphraseKeyService();
   final EncryptionService _encryptionService = EncryptionService();
   final ImageReconstructor _imageReconstructor = ImageReconstructor();
   final HistoryService _history = HistoryService();
@@ -42,6 +44,7 @@ class _ReceiverScreenState extends State<ReceiverScreen> {
       NoiseResistantTransmissionService();
 
   final TextEditingController _pinController = TextEditingController();
+  bool _crossDevice = false;
 
   bool _busy = false;
 
@@ -119,19 +122,24 @@ class _ReceiverScreenState extends State<ReceiverScreen> {
 
     setState(() => _busy = true);
     try {
-      final authed = await _biometricAuth.authenticate(
-        reason: 'Verify your fingerprint to decrypt this audio.',
-      );
-      if (!authed) {
-        _showSnackBar('Fingerprint authentication cancelled.');
-        return;
+      final Uint8List key;
+      if (_crossDevice) {
+        key = _passphraseKeyService.deriveKey(pin);
+      } else {
+        final authed = await _biometricAuth.authenticate(
+          reason: 'Verify your fingerprint to decrypt this audio.',
+        );
+        if (!authed) {
+          _showSnackBar('Fingerprint authentication cancelled.');
+          return;
+        }
+        final biometricKey =
+            await _biometricKeyService.getOrCreateBiometricKey();
+        key = _combinedKeyService.deriveCombinedKey(
+          biometricKey: biometricKey,
+          pin: pin,
+        );
       }
-
-      final biometricKey = await _biometricKeyService.getOrCreateBiometricKey();
-      final key = _combinedKeyService.deriveCombinedKey(
-        biometricKey: biometricKey,
-        pin: pin,
-      );
 
       const legacyBitDurationMs = 20;
       const legacyF0 = 500.0;
@@ -416,6 +424,64 @@ class _ReceiverScreenState extends State<ReceiverScreen> {
                         ),
                         const SizedBox(height: 16),
                         Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.slate900.withOpacity01(0.50),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.slate800),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.devices,
+                                color: _crossDevice ? primary : muted,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Cross-Device Mode',
+                                      style: TextStyle(
+                                        color: isDark
+                                            ? Colors.white
+                                            : AppColors.slate900,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      _crossDevice
+                                          ? 'Any device with the same passphrase can decrypt'
+                                          : 'Only this device (biometric + PIN)',
+                                      style: TextStyle(
+                                        color: muted,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Switch(
+                                value: _crossDevice,
+                                activeColor: primary,
+                                onChanged: (v) => setState(() {
+                                  _crossDevice = v;
+                                  _pinController.clear();
+                                }),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             color: AppColors.slate900.withOpacity01(0.50),
@@ -426,7 +492,8 @@ class _ReceiverScreenState extends State<ReceiverScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'PIN'.toUpperCase(),
+                                (_crossDevice ? 'Passphrase' : 'PIN')
+                                    .toUpperCase(),
                                 style: TextStyle(
                                   color: isDark
                                       ? AppColors.slate500
@@ -447,12 +514,18 @@ class _ReceiverScreenState extends State<ReceiverScreen> {
                                   if (_busy) return;
                                   _processSelectedAudio();
                                 },
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                ],
+                                keyboardType: _crossDevice
+                                    ? TextInputType.visiblePassword
+                                    : TextInputType.number,
+                                inputFormatters: _crossDevice
+                                    ? []
+                                    : [
+                                        FilteringTextInputFormatter.digitsOnly,
+                                      ],
                                 decoration: InputDecoration(
-                                  hintText: 'Enter the same PIN used on Sender',
+                                  hintText: _crossDevice
+                                      ? 'Shared passphrase (same on all devices)'
+                                      : 'Enter the same PIN used on Sender',
                                   hintStyle: TextStyle(color: muted),
                                   filled: true,
                                   fillColor: AppColors.backgroundDark,

@@ -89,7 +89,9 @@ class SettingsScreen extends StatelessWidget {
                     section(
                       title: 'Security',
                       child: const Text(
-                        'Encryption requires fingerprint verification and a PIN. The encryption key is derived from a securely stored device secret combined with your PIN (SHA-256).',
+                        'Two key modes are available:\n\n'
+                        '• Device-only (default): fingerprint + PIN required. The key ties to this device — only this phone can decrypt.\n\n'
+                        '• Cross-device: toggle "Cross-Device Mode" on both Sender and Receiver, then share a strong passphrase. Any device with the same passphrase can decrypt — no biometric needed.',
                       ),
                     ),
                     const SizedBox(height: 16),
